@@ -1,0 +1,42 @@
+# traefik/docker-compose.yml
+version: "3.8"
+
+services:
+  traefik:
+    image: "traefik:v3.0"
+    container_name: "reverse_proxy"
+    command:
+      - "--api.dashboard=true" # Enable Traefik dashboard
+      - "--providers.docker=true"
+      - "--entrypoints.websecure.address=:443"
+      - "--certificatesresolvers.myresolver.acme.tlschallenge=true"
+      - "--certificatesresolvers.myresolver.acme.email=${EMAIL}"
+      - "--certificatesresolvers.myresolver.acme.storage=/letsencrypt/acme.json"
+      # - "--certificatesresolvers.myresolver.acme.dnschallenge.provider=duckdns"
+      # - "--certificatesresolvers.myresolver.acme.dnschallenge.delayBeforeCheck=0"
+      - "--entrypoints.web.address=:8080"
+      - "--entrypoints.websecure.http.tls=true"
+      - "--entrypoints.web.http.redirections.entryPoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entryPoint.scheme=https"
+    ports:
+      - "8080:8080"
+      - "443:443"
+    networks:
+      - traefik-network
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+      - "./letsencrypt:/letsencrypt"
+    environment:
+      - DUCKDNS_TOKEN=your-duckdns-token
+    labels:
+      - "traefik.http.routers.api.rule=Host(`${HOSTNAME}`)"
+      - "traefik.http.routers.api.service=api@internal"
+      - "traefik.http.routers.api.entrypoints=websecure"
+      - "traefik.http.routers.api.tls.certresolver=myresolver"
+      - "traefik.http.middlewares.auth.basicauth.users=admin:$$2y$$10$$OubfWJEneHUHDlQi1H/e7esCnaKLS3UktZzhAdylmIARjzksfDSo2" # Replace with your own hashed credentials
+      - "traefik.http.routers.api.middlewares=auth@docker"
+    restart: always
+
+networks:
+  traefik-network:
+    external: true
